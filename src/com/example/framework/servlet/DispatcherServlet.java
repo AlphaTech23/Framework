@@ -43,6 +43,6 @@ public class DispatcherServlet extends HttpServlet {
 
         resp.getWriter().println("URL : " + url);
         resp.getWriter().println("Controller : " + mapping.getControllerClass().getSimpleName());
-        resp.getWriter().println("Methode : " + mapping.getMethod().getName() + "()");
+        resp.getWriter().println("Methode : " + mapping.getMethod().getName());
     }
 }
