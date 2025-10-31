@@ -12,6 +12,8 @@ public class ContextInitializer implements ServletContextListener {
 
     @Override
     public void contextInitialized(ServletContextEvent sce) {
+        try {
+            ServletContext context = sce.getServletContext();
 
             String packages = context.getInitParameter("controller-packages");
             if (packages == null || packages.isEmpty()) {
