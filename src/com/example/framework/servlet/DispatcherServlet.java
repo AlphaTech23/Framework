@@ -1,6 +1,9 @@
 package com.example.framework.servlet;
 
+import com.example.framework.core.ModelView;
 import com.example.framework.core.RouteMapping;
+
+import jakarta.servlet.RequestDispatcher;
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
@@ -24,14 +27,13 @@ public class DispatcherServlet extends HttpServlet {
     private void dispatch(HttpServletRequest req, HttpServletResponse resp) throws Exception {
         String url = req.getRequestURI().substring(req.getContextPath().length());
 
-        // Gestion des fichiers statiques
         if (getServletContext().getResource(url) != null) {
             getServletContext().getNamedDispatcher("default").forward(req, resp);
             return;
         }
 
-        Map<String, RouteMapping> mappings =
-                (Map<String, RouteMapping>) getServletContext().getAttribute("urlMappings");
+        Map<String, RouteMapping> mappings = (Map<String, RouteMapping>) getServletContext()
+                .getAttribute("urlMappings");
 
         if (mappings == null || !mappings.containsKey(url)) {
             resp.setStatus(404);
@@ -40,9 +42,19 @@ public class DispatcherServlet extends HttpServlet {
         }
 
         RouteMapping mapping = mappings.get(url);
-
-        resp.getWriter().println("URL : " + url);
-        resp.getWriter().println("Controller : " + mapping.getControllerClass().getSimpleName());
-        resp.getWriter().println("Methode : " + mapping.getMethod().getName());
+        Class<?> returnType = mapping.getMethod().getReturnType();
+        Object controllerInstance = mapping.getControllerClass().getDeclaredConstructor().newInstance();
+        Object result = mapping.getMethod().invoke(controllerInstance);
+        if(returnType == String.class) {
+            resp.getWriter().println(result);
+        }
+        if(returnType == ModelView.class) {
+            ModelView model = (ModelView) result;
+            Map<String, Object> attributes = model.getAttributes();
+            for(String key : attributes.keySet()) {
+                req.setAttribute(key, attributes.get(key));
+            }
+            req.getRequestDispatcher(model.getView()).forward(req, resp);
+        }
     }
 }
