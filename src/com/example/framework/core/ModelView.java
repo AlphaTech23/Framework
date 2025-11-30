@@ -1,14 +1,19 @@
 package com.example.framework.core;
 
-import java.util.HasMap;
+import java.util.HashMap;
+import java.util.Map;
 
 public class ModelView {
     private String view;
 
-    private HashMap<String, Object> attributes = new HasMap<>();
+    private Map<String, Object> attributes = new HashMap<>();
 
     public ModelView(String view) {
         this.view = view;
+    }
+
+    public Map<String, Object> getAttributes() {
+        return attributes;
     }
 
     public void addAttribute(String name, Object value) {
