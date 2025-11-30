@@ -12,6 +12,7 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.lang.reflect.Method;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class DispatcherServlet extends HttpServlet {
@@ -35,14 +36,14 @@ public class DispatcherServlet extends HttpServlet {
             return;
         }
 
-        Map<String, RouteMapping> mappings =
-                (Map<String, RouteMapping>) getServletContext().getAttribute("urlMappings");
+        Map<String, List<RouteMapping>> mappings =
+                (Map<String, List<RouteMapping>>) getServletContext().getAttribute("urlMappings");
 
-        HashMap<String, Object> resolved = RouteResolver.resolve(url, mappings);
+        HashMap<String, Object> resolved = RouteResolver.resolve(url, mappings, req.getMethod());
 
         if (resolved == null) {
             resp.setStatus(404);
-            resp.getWriter().println("404 Not Found: " + url);
+            resp.getWriter().println("404 Not Found: " + req.getMethod() + " " + url);
             return;
         }
 

@@ -7,6 +7,6 @@ import java.lang.annotation.Target;
 
 @Retention(RetentionPolicy.RUNTIME)
 @Target(ElementType.METHOD)       
-public @interface Url {
+public @interface RequestMapping {
     String value();
 }
