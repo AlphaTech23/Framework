@@ -4,12 +4,14 @@ import com.example.framework.core.RouteMapping;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 public class RouteResolver {
 
-    public static HashMap<String, Object> resolve(String url, Map<String, RouteMapping> mappings) {
+    public static HashMap<String, Object> resolve(String url, Map<String, List<RouteMapping>> mappings,
+            String requestMethod) {
 
         for (String routePattern : mappings.keySet()) {
 
@@ -18,15 +20,18 @@ public class RouteResolver {
             Pattern pattern = Pattern.compile("^" + regex + "$");
             Matcher matcher = pattern.matcher(url);
 
-            if (matcher.matches()) {
+            for (RouteMapping mapping : mappings.get(routePattern)) {
+                if (matcher.matches() && (mapping.getRequest().equalsIgnoreCase(requestMethod)
+                        || mapping.getRequest().equalsIgnoreCase("ALL"))) {
 
-                Map<String, String> vars = extractVariables(routePattern, matcher);
+                    Map<String, String> vars = extractVariables(routePattern, matcher);
 
-                HashMap<String, Object> result = new HashMap<>();
-                result.put("mapping", mappings.get(routePattern));
-                result.put("pathVars", vars);
+                    HashMap<String, Object> result = new HashMap<>();
+                    result.put("mapping", mapping);
+                    result.put("pathVars", vars);
 
-                return result;
+                    return result;
+                }
             }
         }
 

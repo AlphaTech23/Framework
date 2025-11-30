@@ -6,6 +6,7 @@ import jakarta.servlet.ServletContextEvent;
 import jakarta.servlet.ServletContextListener;
 import jakarta.servlet.annotation.WebListener;
 import java.util.Map;
+import java.util.List;
 
 @WebListener
 public class ContextInitializer implements ServletContextListener {
@@ -20,7 +21,7 @@ public class ContextInitializer implements ServletContextListener {
                 return;
             }
 
-            Map<String, RouteMapping> mappings = RouteScanner.scanPackages(packages);
+            Map<String, List<RouteMapping>> mappings = RouteScanner.scanPackages(packages);
             context.setAttribute("urlMappings", mappings);
         } catch (Exception e) {
             throw new RuntimeException("Erreur lors de l'initialisation du contexte", e);
