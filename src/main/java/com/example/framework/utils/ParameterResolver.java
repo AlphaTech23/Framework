@@ -1,6 +1,10 @@
 package com.example.framework.utils;
 
 import jakarta.servlet.http.HttpServletRequest;
+
+import com.example.framework.annotations.PathVariable;
+import com.example.framework.annotations.RequestParam;
+
 import java.lang.reflect.*;
 import java.util.*;
 
@@ -12,6 +16,12 @@ public class ParameterResolver {
 
         for (int i = 0; i < params.length; i++) {
             String name = params[i].getName();
+            if (params[i].isAnnotationPresent(PathVariable.class)) {
+                name = params[i].getAnnotation(PathVariable.class).value();
+            } 
+            else if (params[i].isAnnotationPresent(RequestParam.class)) {
+                name = params[i].getAnnotation(RequestParam.class).value();
+            }
             String[] values = null;
             if (pathVars != null && pathVars.containsKey(name)) {
                 values = new String[] {pathVars.get(name)};
