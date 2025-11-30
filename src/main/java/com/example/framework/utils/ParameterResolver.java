@@ -17,8 +17,11 @@ public class ParameterResolver {
         for (int i = 0; i < params.length; i++) {
             String name = params[i].getName();
 <<<<<<< Updated upstream
+<<<<<<< Updated upstream
             String[] values = req.getParameterValues(name);
 =======
+=======
+>>>>>>> Stashed changes
             if (params[i].isAnnotationPresent(PathVariable.class)) {
                 name = params[i].getAnnotation(PathVariable.class).value();
             } 
