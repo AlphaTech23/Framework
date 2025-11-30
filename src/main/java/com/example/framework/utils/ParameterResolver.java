@@ -6,13 +6,18 @@ import java.util.*;
 
 public class ParameterResolver {
 
-    public static Object[] resolve(Method method, HttpServletRequest req) throws Exception {
+    public static Object[] resolve(Method method, HttpServletRequest req, Map<String, String> pathVars) throws Exception {
         Parameter[] params = method.getParameters();
         Object[] result = new Object[params.length];
 
         for (int i = 0; i < params.length; i++) {
             String name = params[i].getName();
-            String[] values = req.getParameterValues(name);
+            String[] values = null;
+            if (pathVars != null && pathVars.containsKey(name)) {
+                values = new String[] {pathVars.get(name)};
+            } else {
+                values = req.getParameterValues(name);
+            }
             Class<?> type = params[i].getType();
             Type genericType = params[i].getParameterizedType();
 
