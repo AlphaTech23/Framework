@@ -22,7 +22,7 @@ public class RouteScanner {
                         for (Method method : clazz.getDeclaredMethods()) {
                             if (method.isAnnotationPresent(Url.class)) {
                                 String path = method.getAnnotation(Url.class).value();
-                                mappings.put(path, new RouteMapping(clazz, method));
+                                mappings.put(path, new RouteMapping(clazz, method, null));
                             }
                         }
                     }
