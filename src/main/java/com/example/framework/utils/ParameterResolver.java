@@ -10,18 +10,12 @@ import java.util.*;
 
 public class ParameterResolver {
 
-    public static Object[] resolve(Method method, HttpServletRequest req) throws Exception {
+    public static Object[] resolve(Method method, HttpServletRequest req, Map<String, String> pathVars) throws Exception {
         Parameter[] params = method.getParameters();
         Object[] result = new Object[params.length];
 
         for (int i = 0; i < params.length; i++) {
             String name = params[i].getName();
-<<<<<<< Updated upstream
-<<<<<<< Updated upstream
-            String[] values = req.getParameterValues(name);
-=======
-=======
->>>>>>> Stashed changes
             if (params[i].isAnnotationPresent(PathVariable.class)) {
                 name = params[i].getAnnotation(PathVariable.class).value();
             } 
@@ -34,7 +28,6 @@ public class ParameterResolver {
             } else {
                 values = req.getParameterValues(name);
             }
->>>>>>> Stashed changes
             Class<?> type = params[i].getType();
             Type genericType = params[i].getParameterizedType();
 
