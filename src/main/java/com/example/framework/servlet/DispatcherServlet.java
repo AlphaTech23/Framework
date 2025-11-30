@@ -52,7 +52,7 @@ public class DispatcherServlet extends HttpServlet {
         Object controllerInstance = mapping.getControllerClass().getDeclaredConstructor().newInstance();
         Method method = mapping.getMethod();
 
-        Object[] args = ParameterResolver.resolve(method, req);
+        Object[] args = ParameterResolver.resolve(method, req, pathVars);
 
         Object result = method.invoke(controllerInstance, args);
 
