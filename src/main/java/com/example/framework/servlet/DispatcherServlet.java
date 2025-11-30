@@ -3,12 +3,14 @@ package com.example.framework.servlet;
 import com.example.framework.core.ModelView;
 import com.example.framework.core.RouteMapping;
 import com.example.framework.utils.RouteResolver;
+import com.example.framework.utils.ParameterResolver;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -33,8 +35,8 @@ public class DispatcherServlet extends HttpServlet {
             return;
         }
 
-        Map<String, RouteMapping> mappings = (Map<String, RouteMapping>) getServletContext()
-                .getAttribute("urlMappings");
+        Map<String, RouteMapping> mappings =
+                (Map<String, RouteMapping>) getServletContext().getAttribute("urlMappings");
 
         HashMap<String, Object> resolved = RouteResolver.resolve(url, mappings);
 
@@ -46,19 +48,21 @@ public class DispatcherServlet extends HttpServlet {
 
         RouteMapping mapping = (RouteMapping) resolved.get("mapping");
         Map<String, String> pathVars = (Map<String, String>) resolved.get("pathVars");
-        
+
         Object controllerInstance = mapping.getControllerClass().getDeclaredConstructor().newInstance();
-        Object result = mapping.getMethod().invoke(controllerInstance);
-        if (result.getClass() == String.class) {
-            resp.getWriter().println(result);
-        }
-        if (result.getClass() == ModelView.class) {
-            ModelView model = (ModelView) result;
-            Map<String, Object> attributes = model.getAttributes();
-            for (String key : attributes.keySet()) {
-                req.setAttribute(key, attributes.get(key));
-            }
-            req.getRequestDispatcher(model.getView()).forward(req, resp);
+        Method method = mapping.getMethod();
+
+        Object[] args = ParameterResolver.resolve(method, req);
+
+        Object result = method.invoke(controllerInstance, args);
+
+        if (result instanceof String) {
+            String str = (String) result;
+            resp.getWriter().println(str);
+        } else if (result instanceof ModelView) {
+            ModelView mv = (ModelView) result;
+            mv.getAttributes().forEach(req::setAttribute);
+            req.getRequestDispatcher(mv.getView()).forward(req, resp);
         }
     }
 }
