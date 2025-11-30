@@ -15,6 +15,11 @@ public class ParameterResolver {
         Object[] result = new Object[params.length];
 
         for (int i = 0; i < params.length; i++) {
+            Class<?> type = params[i].getType();
+            if(type.isAssignableFrom(Map.class)) {
+                result[i] = req.getParameterMap();
+                continue;
+            }
             String name = params[i].getName();
             if (params[i].isAnnotationPresent(PathVariable.class)) {
                 name = params[i].getAnnotation(PathVariable.class).value();
@@ -28,7 +33,6 @@ public class ParameterResolver {
             } else {
                 values = req.getParameterValues(name);
             }
-            Class<?> type = params[i].getType();
             Type genericType = params[i].getParameterizedType();
 
             result[i] = convert(values, type, genericType);
