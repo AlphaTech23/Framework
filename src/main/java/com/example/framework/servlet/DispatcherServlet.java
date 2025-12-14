@@ -85,7 +85,7 @@ public class DispatcherServlet extends HttpServlet {
             throw ex;
         }
 
-        Object result = method.invoke(controllerInstance, args);
+        result = method.invoke(controllerInstance, args);
 
         if (result instanceof String) {
             String str = (String) result;
