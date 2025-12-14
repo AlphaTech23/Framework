@@ -58,7 +58,32 @@ public class DispatcherServlet extends HttpServlet {
         Object controllerInstance = mapping.getControllerClass().getDeclaredConstructor().newInstance();
         Method method = mapping.getMethod();
         Object[] args = ParameterResolver.resolve(method, req, pathVars);
-<<<<<<< Updated upstream
+
+        Object result = null;
+
+        try {
+            result = method.invoke(controllerInstance, args);
+            if (method.isAnnotationPresent(Json.class)) {
+                Object data = result;
+                if (result instanceof ModelView)
+                    data = ((ModelView) result).getAttributes();
+                String json = JsonParser.success(data);
+                resp.setContentType("application/json");
+                resp.setCharacterEncoding("UTF-8");
+                resp.getWriter().print(json);
+                return;
+            }
+        } catch (InvocationTargetException ex) {
+            if (method.isAnnotationPresent(Json.class)) {
+                String json = JsonParser.error(ex.getCause().getMessage());
+                resp.setContentType("application/json");
+                resp.setCharacterEncoding("UTF-8");
+                resp.getWriter().print(json);
+
+                return;
+            }
+            throw ex;
+        }
 
         Object result = method.invoke(controllerInstance, args);
 
