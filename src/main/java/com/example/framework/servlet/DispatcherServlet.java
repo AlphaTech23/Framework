@@ -1,15 +1,19 @@
 package com.example.framework.servlet;
 
+import com.example.framework.annotations.Json;
 import com.example.framework.core.ModelView;
 import com.example.framework.core.RouteMapping;
 import com.example.framework.utils.RouteResolver;
+import com.example.framework.utils.JsonParser;
 import com.example.framework.utils.ParameterResolver;
 
 import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+
 import java.io.IOException;
+import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.HashMap;
 import java.util.List;
@@ -36,8 +40,8 @@ public class DispatcherServlet extends HttpServlet {
             return;
         }
 
-        Map<String, List<RouteMapping>> mappings =
-                (Map<String, List<RouteMapping>>) getServletContext().getAttribute("urlMappings");
+        Map<String, List<RouteMapping>> mappings = (Map<String, List<RouteMapping>>) getServletContext()
+                .getAttribute("urlMappings");
 
         HashMap<String, Object> resolved = RouteResolver.resolve(url, mappings, req.getMethod());
 
@@ -50,40 +54,13 @@ public class DispatcherServlet extends HttpServlet {
         RouteMapping mapping = (RouteMapping) resolved.get("mapping");
         Map<String, String> pathVars = (Map<String, String>) resolved.get("pathVars");
 
+        
         Object controllerInstance = mapping.getControllerClass().getDeclaredConstructor().newInstance();
         Method method = mapping.getMethod();
-
         Object[] args = ParameterResolver.resolve(method, req, pathVars);
 <<<<<<< Updated upstream
 
         Object result = method.invoke(controllerInstance, args);
-=======
-        Object result = null;
-
-        try {
-            result = method.invoke(controllerInstance, args);
-            if (method.isAnnotationPresent(Json.class)) {
-                Object data = result;
-                if (result instanceof ModelView)
-                    data = ((ModelView) result).getAttributes();
-                String json = JsonParser.success(data);
-                resp.setContentType("application/json");
-                resp.setCharacterEncoding("UTF-8");
-                resp.getWriter().print(json);
-                return;
-            }
-        } catch (InvocationTargetException ex) {
-            if (method.isAnnotationPresent(Json.class)) {
-                String json = JsonParser.error(ex.getCause().getMessage());
-                resp.setContentType("application/json");
-                resp.setCharacterEncoding("UTF-8");
-                resp.getWriter().print(json);
-
-                return;
-            }
-            throw ex;
-        }
->>>>>>> Stashed changes
 
         if (result instanceof String) {
             String str = (String) result;
