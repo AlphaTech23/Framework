@@ -3,6 +3,7 @@ package com.example.framework.utils;
 import jakarta.servlet.http.HttpServletRequest;
 import com.example.framework.annotations.PathVariable;
 import com.example.framework.annotations.RequestParam;
+import com.example.framework.core.MultipartFile;
 
 import java.lang.reflect.*;
 import java.text.ParseException;
@@ -45,13 +46,19 @@ public class ParameterResolver {
         Parameter[] params = method.getParameters();
         Object[] result = new Object[params.length];
         Map<String, Object> tree = buildTree(req.getParameterMap());
+        Map<String, List<MultipartFile>> uploads = MultipartFileResolver.extractFiles(req);
 
         for (int i = 0; i < params.length; i++) {
             Class<?> type = params[i].getType();
             Type genericType = params[i].getParameterizedType();
 
+            if (isMultipartMap(type, genericType)) {
+                result[i] = uploads;
+                continue;
+            }
+
             if (isMapStringObject(type, genericType)) {
-                result[i] = tree;
+                result[i] = req.getParameterMap();
                 continue;
             }
 
@@ -60,6 +67,19 @@ public class ParameterResolver {
                 name = params[i].getAnnotation(PathVariable.class).value();
             } else if (params[i].isAnnotationPresent(RequestParam.class)) {
                 name = params[i].getAnnotation(RequestParam.class).value();
+            }
+
+            if (isUploadedFileList(type, genericType)) {
+                result[i] = uploads != null
+                        ? uploads.getOrDefault(name, List.of())
+                        : List.of();
+                continue;
+            }
+
+            if (type == MultipartFile.class) {
+                List<MultipartFile> list = uploads != null ? uploads.get(name) : null;
+                result[i] = (list != null && !list.isEmpty()) ? list.get(0) : null;
+                continue;
             }
 
             Object value = (pathVars != null && pathVars.containsKey(name))
@@ -80,13 +100,7 @@ public class ParameterResolver {
         for (Map.Entry<String, String[]> e : params.entrySet()) {
             String key = e.getKey();
             String[] values = e.getValue();
-
-            if (key.endsWith("[]")) {
-                String cleanKey = key.substring(0, key.length() - 2);
-                simpleLists.computeIfAbsent(cleanKey, k -> new ArrayList<>()).addAll(Arrays.asList(values));
-            } else {
-                insertPath(root, key.split("\\."), 0, values);
-            }
+            insertPath(root, key.split("\\."), 0, values);
         }
 
         for (Map.Entry<String, List<String>> e : simpleLists.entrySet()) {
@@ -108,12 +122,7 @@ public class ParameterResolver {
             if (end == -1)
                 break;
             String idxStr = segment.substring(pos + 1, end);
-
-            if (idxStr.isEmpty()) {
-                indexes.add(-1);
-            } else {
-                indexes.add(Integer.parseInt(idxStr));
-            }
+            indexes.add(Integer.parseInt(idxStr));
             pos = segment.indexOf('[', end);
         }
 
@@ -315,6 +324,26 @@ public class ParameterResolver {
         ParameterizedType pt = (ParameterizedType) genericType;
         return pt.getActualTypeArguments()[0] == String.class
                 && pt.getActualTypeArguments()[1] == Object.class;
+    }
+
+    private static boolean isMultipartMap(Class<?> type, Type gType) {
+        if (!Map.class.isAssignableFrom(type))
+            return false;
+        if (!(gType instanceof ParameterizedType pt))
+            return false;
+
+        return pt.getActualTypeArguments()[0] == String.class
+                && pt.getActualTypeArguments()[1] instanceof ParameterizedType p2
+                && p2.getRawType() == List.class
+                && p2.getActualTypeArguments()[0] == MultipartFile.class;
+    }
+
+    private static boolean isUploadedFileList(Class<?> type, Type gType) {
+        if (!List.class.isAssignableFrom(type))
+            return false;
+        if (!(gType instanceof ParameterizedType pt))
+            return false;
+        return pt.getActualTypeArguments()[0] == MultipartFile.class;
     }
 
     private static boolean isPrimitiveOrWrapper(Class<?> t) {

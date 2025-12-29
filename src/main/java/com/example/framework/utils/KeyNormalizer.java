@@ -6,7 +6,6 @@ import java.util.regex.Pattern;
 
 public class KeyNormalizer {
 
-    // Pattern pour capturer le nom et toutes les dimensions (y compris multidimensionnelles)
     private static final Pattern MULTIDIM_SEGMENT = 
             Pattern.compile("([a-zA-Z0-9_]+)((?:\\[(.*?)\\])*)");
 
@@ -61,38 +60,33 @@ public class KeyNormalizer {
         Matcher m = MULTIDIM_SEGMENT.matcher(segment);
         
         if (!m.matches()) {
-            // Si le pattern ne matche pas, on traite comme un segment normal
             String base = parent.isEmpty() ? segment : parent + "." + segment;
             return resolveMultidimensional(segments, pos + 1, base, lastArraySegmentPos, counters);
         }
 
         String name = m.group(1);
-        String allBrackets = m.group(2); // Contient tous les [] avec leur contenu
+        String allBrackets = m.group(2); 
         
-        // Extraire toutes les dimensions
         List<String> dimensions = extractDimensions(allBrackets);
         
         String base = parent.isEmpty() ? name : parent + "." + name;
         
-        // Construire le chemin avec les dimensions
         StringBuilder currentPath = new StringBuilder(base);
         
         for (int dimIndex = 0; dimIndex < dimensions.size(); dimIndex++) {
             String dimValue = dimensions.get(dimIndex);
             
             if (dimValue == null || dimValue.isEmpty()) {
-                // Dimension vide []
                 if (pos == lastArraySegmentPos && dimIndex == dimensions.size() - 1) {
-                    // Dernière dimension vide du dernier segment contenant []
-                    String counterKey = parent + "|" + name + "|dim" + dimIndex;
+                    String counterKey = currentPath.toString() + "|dim" + dimIndex;
+                    if(parent.contains("[]"))
+                        counterKey = parent + "|" + name + "|dim" + dimIndex;
                     int index = counters.compute(counterKey, (k, v) -> v == null ? 0 : v + 1);
                     currentPath.append("[").append(index).append("]");
                 } else {
-                    // Dimension vide non-terminale
                     currentPath.append("[0]");
                 }
             } else {
-                // Dimension avec valeur spécifiée [x]
                 currentPath.append("[").append(dimValue).append("]");
             }
         }
@@ -107,7 +101,6 @@ public class KeyNormalizer {
             return dimensions;
         }
         
-        // Pattern pour extraire le contenu de chaque paire de brackets
         Pattern dimPattern = Pattern.compile("\\[(.*?)\\]");
         Matcher dimMatcher = dimPattern.matcher(allBrackets);
         
