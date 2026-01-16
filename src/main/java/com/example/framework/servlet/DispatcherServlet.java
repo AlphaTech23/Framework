@@ -1,6 +1,7 @@
 package com.example.framework.servlet;
 
 import com.example.framework.annotations.Json;
+import com.example.framework.annotations.Session;
 import com.example.framework.core.ModelView;
 import com.example.framework.core.RouteMapping;
 import com.example.framework.utils.RouteResolver;
@@ -11,14 +12,17 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServlet;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
-import jakarta.servlet.annotation.MultipartConfig;
+import jakarta.servlet.http.HttpSession;
 
 import java.io.IOException;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
+import java.util.Enumeration;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class DispatcherServlet extends HttpServlet {
 
@@ -55,15 +59,44 @@ public class DispatcherServlet extends HttpServlet {
         RouteMapping mapping = (RouteMapping) resolved.get("mapping");
         Map<String, String> pathVars = (Map<String, String>) resolved.get("pathVars");
 
-        
         Object controllerInstance = mapping.getControllerClass().getDeclaredConstructor().newInstance();
         Method method = mapping.getMethod();
-        Object[] args = ParameterResolver.resolve(method, req, pathVars);
+
+        Map<String, Object> sessionMap = null;
+        HttpSession httpSession = null;
+
+        for (var p : method.getParameters()) {
+            if (p.isAnnotationPresent(Session.class)) {
+                httpSession = req.getSession(true);
+                sessionMap = new HashMap<>();
+                break;
+            }
+        }
+
+        Set<String> originalKeys = new HashSet<>();
+
+        if (httpSession != null) {
+            Enumeration<String> names = httpSession.getAttributeNames();
+            while (names.hasMoreElements()) {
+                originalKeys.add(names.nextElement());
+            }
+        }
+
+        Object[] args = ParameterResolver.resolve(method, req, pathVars, sessionMap, httpSession);
 
         Object result = null;
 
         try {
             result = method.invoke(controllerInstance, args);
+            if (sessionMap != null) {
+                for (String key : originalKeys) {
+                    if (!sessionMap.containsKey(key)) {
+                        httpSession.removeAttribute(key);
+                    }
+                }
+                sessionMap.forEach(httpSession::setAttribute);
+            }
+
             if (method.isAnnotationPresent(Json.class)) {
                 Object data = result;
                 if (result instanceof ModelView)
@@ -85,8 +118,6 @@ public class DispatcherServlet extends HttpServlet {
             }
             throw ex;
         }
-
-        result = method.invoke(controllerInstance, args);
 
         if (result instanceof String) {
             String str = (String) result;
