@@ -1,8 +1,11 @@
 package com.example.framework.utils;
 
 import jakarta.servlet.http.HttpServletRequest;
+import jakarta.servlet.http.HttpSession;
+
 import com.example.framework.annotations.PathVariable;
 import com.example.framework.annotations.RequestParam;
+import com.example.framework.annotations.Session;
 import com.example.framework.core.MultipartFile;
 
 import java.lang.reflect.*;
@@ -41,7 +44,8 @@ public class ParameterResolver {
         }
     }
 
-    public static Object[] resolve(Method method, HttpServletRequest req, Map<String, String> pathVars)
+    public static Object[] resolve(Method method, HttpServletRequest req, Map<String, String> pathVars,
+            Map<String, Object> sessionMap, HttpSession httpSession)
             throws Exception {
         Parameter[] params = method.getParameters();
         Object[] result = new Object[params.length];
@@ -54,6 +58,23 @@ public class ParameterResolver {
 
             if (isMultipartMap(type, genericType)) {
                 result[i] = uploads;
+                continue;
+            }
+
+            if (params[i].isAnnotationPresent(Session.class)) {
+                if (!isMapStringObject(type, genericType)) {
+                    throw new IllegalArgumentException("@Session doit être de type Map<String, Object>");
+                }
+
+                if (sessionMap != null) {
+                    Enumeration<String> names = httpSession.getAttributeNames();
+                    while (names.hasMoreElements()) {
+                        String attr = names.nextElement();
+                        sessionMap.put(attr, httpSession.getAttribute(attr));
+                    }
+                }
+
+                result[i] = sessionMap;
                 continue;
             }
 
