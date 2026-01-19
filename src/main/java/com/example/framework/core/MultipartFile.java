@@ -5,18 +5,14 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.file.Path;
 
-import jakarta.servlet.ServletContext;
-
 public class MultipartFile {
 
     private final String name;
     private final byte[] content;
-    private final ServletContext context;
 
     public MultipartFile(String name, byte[] content) {
         this.name = name;
         this.content = content;
-        this.context = ContextHolder.getServletContext();
     }
 
     public String getName() {
@@ -35,7 +31,7 @@ public class MultipartFile {
     }
 
     public void save(String relativePath) throws IOException {
-        Path basePath = (Path) context.getAttribute("upload.root");
+        Path basePath = (Path) ParamsHolder.get("upload.root");
         relativePath += "." + extension();
         File target = new File(basePath.toString(), relativePath);
         target.getParentFile().mkdirs();
@@ -45,7 +41,7 @@ public class MultipartFile {
     }
 
     public void save() throws IOException {
-        Path basePath = (Path) context.getAttribute("upload.root");
+        Path basePath = (Path) ParamsHolder.get("upload.root");
         File target = new File(basePath.toString(), name);
         target.getParentFile().mkdirs();
         try (FileOutputStream fos = new FileOutputStream(target)) {
