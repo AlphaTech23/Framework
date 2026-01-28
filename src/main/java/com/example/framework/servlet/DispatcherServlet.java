@@ -3,9 +3,9 @@ package com.example.framework.servlet;
 import com.example.framework.annotations.Allowed;
 import com.example.framework.annotations.Authorized;
 import com.example.framework.annotations.Json;
-import com.example.framework.annotations.Session;
 import com.example.framework.core.ModelView;
 import com.example.framework.core.RouteMapping;
+import com.example.framework.core.UserSession;
 import com.example.framework.utils.RouteResolver;
 import com.example.framework.utils.AppProperties;
 import com.example.framework.utils.JsonParser;
@@ -48,14 +48,27 @@ public class DispatcherServlet extends HttpServlet {
         resp.getWriter().println(message);
     }
 
-    private Object getUserRole(HttpServletRequest req, HttpSession httpSession) {
-        if (httpSession == null)
-            httpSession = req.getSession(false);
-        String roleAttrName = AppProperties.get("role-attribute-name");
-        if(roleAttrName == null) roleAttrName = getServletContext().getInitParameter("role-attribute-name");
-        if (roleAttrName != null)
-            return httpSession.getAttribute(roleAttrName);
+    private UserSession getUser(HttpSession httpSession) {
+        String userSessionName = AppProperties.get("user.session.name");
+        if (userSessionName == null)
+            userSessionName = getServletContext().getInitParameter("user-session-name");
+        if (userSessionName != null) {
+            Object user = httpSession.getAttribute(userSessionName);
+            if (user instanceof UserSession)
+                return (UserSession) user;
+        }
         return null;
+    }
+
+    private void updateSession(Map<String, Object> sessionMap, HttpSession httpSession) {
+        if (!sessionMap.isEmpty()) {
+            Enumeration<String> keys = httpSession.getAttributeNames();
+            while (keys.hasMoreElements()) {
+                String key = keys.nextElement();
+                httpSession.removeAttribute(key);
+            }
+            sessionMap.forEach(httpSession::setAttribute);
+        }
     }
 
     @SuppressWarnings("unchecked")
@@ -83,37 +96,36 @@ public class DispatcherServlet extends HttpServlet {
         Object controllerInstance = mapping.getControllerClass().getDeclaredConstructor().newInstance();
         Method method = mapping.getMethod();
 
-        Map<String, Object> sessionMap = null;
-        HttpSession httpSession = null;
+        Map<String, Object> sessionMap = new HashMap<>();
+        HttpSession httpSession = req.getSession(true);
+        UserSession user = getUser(httpSession);
+        Boolean authentified = user != null && user.isAuthentified();
 
-        if (method.isAnnotationPresent(Authorized.class)) {
-            if (getUserRole(req, httpSession) == null) {
-                printError(resp, 503, "Access denied: you must be logged in to view this page.");
-                return;
-            }
-        }
 
         if (method.isAnnotationPresent(Allowed.class)) {
             String[] roles = method.getAnnotation(Allowed.class).value();
             boolean allowed = false;
-            Object userRole = getUserRole(req, httpSession);
-            if (userRole != null) {
-                for (String role : roles) {
-                    if (getUserRole(req, httpSession).equals(role))
-                        allowed = true;
+            if (authentified) {
+                String[] userRoles = user.getRoles();
+                if (userRoles != null && roles != null) {
+                    for (String role : roles) {
+                        for (String userRole : userRoles) {
+                            if (role != null && role.equalsIgnoreCase(userRole))
+                                allowed = true;
+                        }
+                    }
                 }
             }
-            if (!allowed)
+            if (!allowed) {
                 printError(resp, 503, "Access denied: you must be logged as " + String.join(" or ", roles)
                         + " in to view this page.");
-        }
-
-        for (var p : method.getParameters()) {
-            if (p.isAnnotationPresent(Session.class)) {
-                if (httpSession == null)
-                    httpSession = req.getSession(true);
-                sessionMap = new HashMap<>();
-                break;
+                return;
+            }
+                        
+        } else if (method.isAnnotationPresent(Authorized.class)) {
+            if (authentified) {
+                printError(resp, 503, "Access denied: you must be logged in to view this page.");
+                return;
             }
         }
 
@@ -123,15 +135,7 @@ public class DispatcherServlet extends HttpServlet {
 
         try {
             result = method.invoke(controllerInstance, args);
-            if (sessionMap != null) {
-                Enumeration<String> keys = httpSession.getAttributeNames();
-                while (keys.hasMoreElements()) {
-                    String key = keys.nextElement();
-                    httpSession.removeAttribute(key);
-                }
-                sessionMap.forEach(httpSession::setAttribute);
-            }
-
+            updateSession(sessionMap, httpSession);
             if (method.isAnnotationPresent(Json.class)) {
                 Object data = result;
                 if (result instanceof ModelView)

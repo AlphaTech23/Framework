@@ -33,18 +33,24 @@ public class JsonParser {
     private static String toJsonValue(Object obj, int depth) {
         if (obj == null) return "null";
 
-        if (obj instanceof Optional<?> opt) {
+        if (obj instanceof Optional<?>) {
+            Optional<?> opt = (Optional<?>) obj;
             return toJsonValue(opt.orElse(null), depth);
         }
 
-        if (obj instanceof String s) return toJsonString(s);
+        if (obj instanceof String) {
+            String s = (String) obj;
+            return toJsonString(s);
+        }
         if (obj instanceof Number || obj instanceof Boolean) return obj.toString();
 
-        if (obj instanceof Map<?, ?> map) {
+        if (obj instanceof Map<?, ?>) {
+            Map<?, ?> map = (Map<?, ?>) obj;
             return mapToJson(map, depth);
         }
 
-        if (obj instanceof Collection<?> col) {
+        if (obj instanceof Collection<?>) {
+            Collection<?> col = (Collection<?>) obj;
             return collectionToJson(col, depth);
         }
 
