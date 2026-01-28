@@ -29,12 +29,14 @@ public class ParameterResolver {
 
     private static void printTree(Object obj, int indent) {
         String prefix = " ".repeat(indent * 2);
-        if (obj instanceof Map<?, ?> map) {
+        if (obj instanceof Map<?, ?>) {
+            Map<?, ?> map = (Map<?, ?>) obj;
             for (Map.Entry<?, ?> e : map.entrySet()) {
                 System.out.println(prefix + e.getKey() + ":");
                 printTree(e.getValue(), indent + 1);
             }
-        } else if (obj instanceof List<?> list) {
+        } else if (obj instanceof List<?>) {
+            List<?> list = (List<?>) obj;
             for (int i = 0; i < list.size(); i++) {
                 System.out.println(prefix + "[" + i + "]:");
                 printTree(list.get(i), indent + 1);
@@ -66,12 +68,10 @@ public class ParameterResolver {
                     throw new IllegalArgumentException("@Session doit être de type Map<String, Object>");
                 }
 
-                if (sessionMap != null) {
-                    Enumeration<String> names = httpSession.getAttributeNames();
-                    while (names.hasMoreElements()) {
-                        String attr = names.nextElement();
-                        sessionMap.put(attr, httpSession.getAttribute(attr));
-                    }
+                Enumeration<String> names = httpSession.getAttributeNames();
+                while (names.hasMoreElements()) {
+                    String attr = names.nextElement();
+                    sessionMap.put(attr, httpSession.getAttribute(attr));
                 }
 
                 result[i] = sessionMap;
@@ -220,8 +220,10 @@ public class ParameterResolver {
         }
 
         if (Optional.class.isAssignableFrom(type)) {
-            if (!(genericType instanceof ParameterizedType pt))
+            if (!(genericType instanceof ParameterizedType))
                 return Optional.empty();
+
+            ParameterizedType pt = (ParameterizedType) genericType;
             Type actualType = pt.getActualTypeArguments()[0];
             Object value = convertValue(raw, (Class<?>) actualType, actualType);
             return Optional.ofNullable(value);
@@ -300,14 +302,17 @@ public class ParameterResolver {
         if (!(raw instanceof List<?>))
             return null;
 
-        if (!(gType instanceof ParameterizedType pt)) {
+        if (!(gType instanceof ParameterizedType)) {
             return new ArrayList<>((List<Object>) raw);
         }
 
+        ParameterizedType pt = (ParameterizedType) gType;
         Type elemT = pt.getActualTypeArguments()[0];
 
-        if (elemT instanceof ParameterizedType nested && List.class.isAssignableFrom((Class<?>) nested.getRawType())) {
-            return convertMultiDimList(raw, collType, pt);
+        if (elemT instanceof ParameterizedType) {
+            ParameterizedType nested = (ParameterizedType) elemT;
+            if (List.class.isAssignableFrom((Class<?>) nested.getRawType()))
+                return convertMultiDimList(raw, collType, pt);
         }
 
         List<Object> rawList = (List<Object>) raw;
@@ -350,20 +355,25 @@ public class ParameterResolver {
     private static boolean isMultipartMap(Class<?> type, Type gType) {
         if (!Map.class.isAssignableFrom(type))
             return false;
-        if (!(gType instanceof ParameterizedType pt))
+        if (!(gType instanceof ParameterizedType))
             return false;
-
-        return pt.getActualTypeArguments()[0] == String.class
-                && pt.getActualTypeArguments()[1] instanceof ParameterizedType p2
-                && p2.getRawType() == List.class
-                && p2.getActualTypeArguments()[0] == MultipartFile.class;
+        ParameterizedType pt = (ParameterizedType) gType;
+        if (pt.getActualTypeArguments()[0] == String.class
+                && pt.getActualTypeArguments()[1] instanceof ParameterizedType) {
+            ParameterizedType p2 = (ParameterizedType) pt.getActualTypeArguments()[1];
+            return p2.getRawType() == List.class
+                    && p2.getActualTypeArguments()[0] == MultipartFile.class;
+        }
+        return false;
     }
 
     private static boolean isUploadedFileList(Class<?> type, Type gType) {
         if (!List.class.isAssignableFrom(type))
             return false;
-        if (!(gType instanceof ParameterizedType pt))
+        if (!(gType instanceof ParameterizedType))
             return false;
+
+        ParameterizedType pt = (ParameterizedType) gType;
         return pt.getActualTypeArguments()[0] == MultipartFile.class;
     }
 
@@ -397,9 +407,10 @@ public class ParameterResolver {
     }
 
     private static Object convertMultiDimArray(Object raw, Class<?> arrayType) throws Exception {
-        if (!(raw instanceof List<?> rawList))
+        if (!(raw instanceof List<?>))
             return null;
 
+        List<?> rawList = (List<?>) raw;
         Class<?> componentType = arrayType.getComponentType();
         Object array = Array.newInstance(componentType, rawList.size());
 
@@ -417,9 +428,10 @@ public class ParameterResolver {
 
     @SuppressWarnings("unchecked")
     private static Object convertMultiDimList(Object raw, Class<?> collType, ParameterizedType gType) throws Exception {
-        if (!(raw instanceof List<?> rawList))
+        if (!(raw instanceof List<?>))
             return null;
 
+        List<?> rawList = (List<?>) raw;
         Collection<Object> list = Set.class.isAssignableFrom(collType)
                 ? new LinkedHashSet<>()
                 : new ArrayList<>();
@@ -427,15 +439,21 @@ public class ParameterResolver {
         Type elemType = gType.getActualTypeArguments()[0];
 
         for (Object item : rawList) {
-            if (item instanceof List<?> && elemType instanceof ParameterizedType nestedPT
-                    && ((Class<?>) nestedPT.getRawType()).isAssignableFrom(List.class)) {
-                list.add(convertMultiDimList(item, (Class<?>) nestedPT.getRawType(), nestedPT));
-                continue;
+            if (item instanceof List<?> && elemType instanceof ParameterizedType) {
+                ParameterizedType nestedPT = (ParameterizedType) elemType;
+                Class<?> clazz = (Class<?>) nestedPT.getRawType();
+                if (clazz.isAssignableFrom(List.class)) {
+                    list.add(convertMultiDimList(item, (Class<?>) nestedPT.getRawType(), nestedPT));
+                    continue;
+                }
             }
 
-            if (item instanceof Map && elemType instanceof Class<?> c && !Map.class.isAssignableFrom(c)) {
-                list.add(convertObject((Map<String, Object>) item, c));
-                continue;
+            if (item instanceof Map && elemType instanceof Class<?>) {
+                Class<?> c = (Class<?>) elemType;
+                if (!Map.class.isAssignableFrom(c)) {
+                    list.add(convertObject((Map<String, Object>) item, c));
+                    continue;
+                }
             }
 
             list.add(convertValue(item, (Class<?>) elemType, elemType));

@@ -1,10 +1,13 @@
 package com.example.framework.servlet;
 
+import com.example.framework.annotations.Allowed;
+import com.example.framework.annotations.Authorized;
 import com.example.framework.annotations.Json;
-import com.example.framework.annotations.Session;
 import com.example.framework.core.ModelView;
 import com.example.framework.core.RouteMapping;
+import com.example.framework.core.UserSession;
 import com.example.framework.utils.RouteResolver;
+import com.example.framework.utils.AppProperties;
 import com.example.framework.utils.JsonParser;
 import com.example.framework.utils.ParameterResolver;
 
@@ -19,10 +22,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.util.Enumeration;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 public class DispatcherServlet extends HttpServlet {
 
@@ -33,6 +34,40 @@ public class DispatcherServlet extends HttpServlet {
             dispatch(req, resp);
         } catch (Exception e) {
             throw new ServletException(e);
+        }
+    }
+
+    private void printJSON(HttpServletResponse resp, String json) throws Exception {
+        resp.setContentType("application/json");
+        resp.setCharacterEncoding("UTF-8");
+        resp.getWriter().print(json);
+    }
+
+    private void printError(HttpServletResponse resp, Integer status, String message) throws Exception {
+        resp.setStatus(status);
+        resp.getWriter().println(message);
+    }
+
+    private UserSession getUser(HttpSession httpSession) {
+        String userSessionName = AppProperties.get("user.session.name");
+        if (userSessionName == null)
+            userSessionName = getServletContext().getInitParameter("user-session-name");
+        if (userSessionName != null) {
+            Object user = httpSession.getAttribute(userSessionName);
+            if (user instanceof UserSession)
+                return (UserSession) user;
+        }
+        return null;
+    }
+
+    private void updateSession(Map<String, Object> sessionMap, HttpSession httpSession) {
+        if (!sessionMap.isEmpty()) {
+            Enumeration<String> keys = httpSession.getAttributeNames();
+            while (keys.hasMoreElements()) {
+                String key = keys.nextElement();
+                httpSession.removeAttribute(key);
+            }
+            sessionMap.forEach(httpSession::setAttribute);
         }
     }
 
@@ -51,8 +86,7 @@ public class DispatcherServlet extends HttpServlet {
         HashMap<String, Object> resolved = RouteResolver.resolve(url, mappings, req.getMethod());
 
         if (resolved == null) {
-            resp.setStatus(404);
-            resp.getWriter().println("404 Not Found: " + req.getMethod() + " " + url);
+            printError(resp, 404, "404 Not Found: " + req.getMethod() + " " + url);
             return;
         }
 
@@ -62,23 +96,36 @@ public class DispatcherServlet extends HttpServlet {
         Object controllerInstance = mapping.getControllerClass().getDeclaredConstructor().newInstance();
         Method method = mapping.getMethod();
 
-        Map<String, Object> sessionMap = null;
-        HttpSession httpSession = null;
+        Map<String, Object> sessionMap = new HashMap<>();
+        HttpSession httpSession = req.getSession(true);
+        UserSession user = getUser(httpSession);
+        Boolean authentified = user != null && user.isAuthentified();
 
-        for (var p : method.getParameters()) {
-            if (p.isAnnotationPresent(Session.class)) {
-                httpSession = req.getSession(true);
-                sessionMap = new HashMap<>();
-                break;
+
+        if (method.isAnnotationPresent(Allowed.class)) {
+            String[] roles = method.getAnnotation(Allowed.class).value();
+            boolean allowed = false;
+            if (authentified) {
+                String[] userRoles = user.getRoles();
+                if (userRoles != null && roles != null) {
+                    for (String role : roles) {
+                        for (String userRole : userRoles) {
+                            if (role != null && role.equalsIgnoreCase(userRole))
+                                allowed = true;
+                        }
+                    }
+                }
             }
-        }
-
-        Set<String> originalKeys = new HashSet<>();
-
-        if (httpSession != null) {
-            Enumeration<String> names = httpSession.getAttributeNames();
-            while (names.hasMoreElements()) {
-                originalKeys.add(names.nextElement());
+            if (!allowed) {
+                printError(resp, 503, "Access denied: you must be logged as " + String.join(" or ", roles)
+                        + " in to view this page.");
+                return;
+            }
+                        
+        } else if (method.isAnnotationPresent(Authorized.class)) {
+            if (authentified) {
+                printError(resp, 503, "Access denied: you must be logged in to view this page.");
+                return;
             }
         }
 
@@ -88,32 +135,20 @@ public class DispatcherServlet extends HttpServlet {
 
         try {
             result = method.invoke(controllerInstance, args);
-            if (sessionMap != null) {
-                for (String key : originalKeys) {
-                    if (!sessionMap.containsKey(key)) {
-                        httpSession.removeAttribute(key);
-                    }
-                }
-                sessionMap.forEach(httpSession::setAttribute);
-            }
-
+            updateSession(sessionMap, httpSession);
             if (method.isAnnotationPresent(Json.class)) {
                 Object data = result;
                 if (result instanceof ModelView)
                     data = ((ModelView) result).getAttributes();
                 String json = JsonParser.success(data);
-                resp.setContentType("application/json");
-                resp.setCharacterEncoding("UTF-8");
-                resp.getWriter().print(json);
+                printJSON(resp, json);
                 return;
             }
+
         } catch (InvocationTargetException ex) {
             if (method.isAnnotationPresent(Json.class)) {
                 String json = JsonParser.error(ex.getCause().getMessage());
-                resp.setContentType("application/json");
-                resp.setCharacterEncoding("UTF-8");
-                resp.getWriter().print(json);
-
+                printJSON(resp, json);
                 return;
             }
             throw ex;

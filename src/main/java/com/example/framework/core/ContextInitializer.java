@@ -20,12 +20,13 @@ public class ContextInitializer implements ServletContextListener {
     public void contextInitialized(ServletContextEvent sce) {
         try {
             ServletContext context = sce.getServletContext();
-            ContextHolder.setServletContext(context);
-
+            
             String uploadBase = context.getInitParameter("upload.root");
             if (uploadBase == null || uploadBase.isBlank()) {
                 uploadBase = "uploads";
             }
+
+            ParamsHolder.add("upload.root", uploadBase);
 
             Path uploadRoot = Path.of(uploadBase);
             if (!uploadRoot.isAbsolute()) {

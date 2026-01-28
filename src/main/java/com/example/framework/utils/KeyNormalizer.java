@@ -13,7 +13,7 @@ public class KeyNormalizer {
         Map<String, List<String>> out = new LinkedHashMap<>();
         Map<String, Integer> counters = new HashMap<>();
 
-        for (var entry : input.entrySet()) {
+        for (Map.Entry<String, String[]> entry : input.entrySet()) {
             String key = entry.getKey();
             String[] values = entry.getValue();
 
