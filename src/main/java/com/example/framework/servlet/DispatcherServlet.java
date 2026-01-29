@@ -50,6 +50,7 @@ public class DispatcherServlet extends HttpServlet {
 
     private UserSession getUser(HttpSession httpSession) {
         String userSessionName = AppProperties.get("user.session.name");
+
         if (userSessionName == null)
             userSessionName = getServletContext().getInitParameter("user-session-name");
         if (userSessionName != null) {

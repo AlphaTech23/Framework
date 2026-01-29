@@ -1,29 +1,48 @@
 package com.example.framework.utils;
 
+import jakarta.servlet.ServletContext;
 import java.io.InputStream;
 import java.util.Properties;
 
 public class AppProperties {
 
-    private static Properties properties = new Properties();
+    private static final Properties PROPS = new Properties();
+    private static boolean initialized = false;
 
-    static {
-        try (InputStream in = AppProperties.class.getClassLoader().getResourceAsStream("app.properties")) {
+    private AppProperties() {
+    }
+
+    public static void init(ServletContext context) {
+        if (initialized)
+            return;
+
+        try (InputStream in = context.getResourceAsStream("/WEB-INF/app.properties")) {
+
             if (in != null) {
-                properties.load(in);
-            } else {
-                System.err.println("app.properties not found in classpath!");
-            }
+                PROPS.load(in);
+                initialized = true;
+            } else
+                System.out.println("WEB-INF/app.properties introuvable");
+
         } catch (Exception e) {
-            e.printStackTrace();
+            throw new RuntimeException("Erreur chargement app.properties", e);
         }
     }
 
     public static String get(String key) {
-        return properties.getProperty(key);
+        checkInit();
+        return PROPS.getProperty(key);
     }
 
     public static String get(String key, String defaultValue) {
-        return properties.getProperty(key, defaultValue);
+        checkInit();
+        return PROPS.getProperty(key, defaultValue);
+    }
+
+    private static void checkInit() {
+        if (!initialized) {
+            throw new IllegalStateException(
+                    "AppProperties non initialisé. Appelle AppProperties.init(ServletContext)");
+        }
     }
 }
